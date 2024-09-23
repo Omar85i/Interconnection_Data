@@ -3,7 +3,7 @@
 %%% INFO: This is a MatLab file containing the relevant data used to prepare the paper called
 %%%      'Detection of Interconnections Between Unstable Resonant Orbits Via Machine Learning' 
 
-%% DATASET (READY FOR TRAINING)
+%% DATASET READY FOR TRAINING
 
 % A slight preprocessing is applied to the original 948 input features, to alleviate class 
 % imbalance, eliminating for each classifier those that belong to the resonant family 
@@ -24,7 +24,6 @@ load("Testsets.mat");
 
 % A brief code is provided that loads the trained DNN models and processes the independent 
 % test set for performance evaluation:
-
 for i=1:length(Testsets)
     test = Testsets{i};
     % (DNNs + BO) trained classifiers: ---------------------------------------------------------------------
@@ -66,3 +65,49 @@ end
 % variables. However, they are not needed for the performance evaluation.
 
 %% MODELS DESIGNED FOR THE MULTI-CLASSIFIER BASED ON ELM/WELM + GA
+
+load("Testsets.mat")
+load("Datasets.mat")
+
+ID=[3, 5, 7, 9:15]';
+act=@(y) (1-exp(-0.5*y))./(1+exp(-0.5*y)); % activation function
+
+for i=1:length(ID)
+
+    %%% test data
+    testBatch=Testsets{:,ID(i)};
+    x=testBatch(:,1:3); % input
+    t=testBatch(:,4);   % target
+
+    D=Datasets{ID(i)}; D(:,[4 5])=[];
+
+    %%% normalization [-1,1] and labels change (1/0)->(1,-1)
+    t(t==0)=-1;
+    x=(x-min(D,[],1))./(max(D,[],1)-min(D,[],1))*2-1;
+
+    %%% classificator loading
+    name="Trained_model_C"+num2str(ID(i));
+    load(name)
+
+    w=Y{1};    % input weights
+    b=Y{2};    % hidden biases
+    beta=Y{3}; % output weights
+
+    %%% ELM output
+    yTst=(w*x'+b)';
+    H=act(yTst);
+    f=sign(H*beta);
+
+    %%% performance evaluation
+    TP=sum(f(t==1)==1);   % number of true positives
+    TN=sum(f(t==-1)==-1); % number of true negatives
+    Npp=sum(f==1);        % number of predicted positives
+    Npn=sum(f==-1);       % number of predicted negatives
+    FP=Npp-TP;            % number of false positives
+    FN=Npn-TN;            % number of false negatives
+
+    accuracy=(TP+TN)/length(f);
+    precision=TP/Npp;
+    recall=TP/sum(t==1);
+
+end
